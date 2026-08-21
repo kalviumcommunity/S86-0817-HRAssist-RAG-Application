@@ -1,0 +1,8 @@
+INFO: REQUEST: [{'role': 'system', 'content': 'You are a concise HR assistant.'}, {'role': 'user', 'content': 'Say hello and explain what an HR assistant can help with in one sentence.'}]
+
+INFO: MODEL: gpt-4.1-mini
+
+MODEL RESPONSE:
+Hello! I am an HR assistant and I can help answer questions about employees, policies, recruitment, and workplace processes.
+
+INFO: RESPONSE: Hello! I am an HR assistant and I can help answer questions about employees, policies, recruitment, and workplace processes.
