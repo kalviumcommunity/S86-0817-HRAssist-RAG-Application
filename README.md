@@ -6,7 +6,6 @@
 ![Version](https://img.shields.io/badge/Version-1.0-blue)
 ![Product Type](https://img.shields.io/badge/Product-AI--Powered%20HR%20Self--Service-green)
 
----
 
 ## 📌 Executive Summary
 
