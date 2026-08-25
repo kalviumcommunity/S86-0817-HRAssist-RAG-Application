@@ -6,6 +6,7 @@ from src.prompt_engine import HRAssistPromptBuilder, Message, Role, compare_prom
 from src.model_config import ModelConfig, LLMController
 from src.document_loader import DocumentLoader, LoadedDocument
 from src.document_chunker import DocumentChunker, Chunk, ChunkMetadata, tag_chunks, estimate_tokens
+from src.similarity import cosine_similarity, rank_chunks
 
 __all__ = [
     "HRAssistPromptBuilder",
@@ -21,4 +22,6 @@ __all__ = [
     "ChunkMetadata",
     "tag_chunks",
     "estimate_tokens",
+    "cosine_similarity",
+    "rank_chunks",
 ]
