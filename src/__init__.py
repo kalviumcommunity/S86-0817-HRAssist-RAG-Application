@@ -15,6 +15,7 @@ from src.embedding_quality import (
     detect_near_duplicate_chunks,
     DEFAULT_TEST_CASES,
 )
+from src.retriever import retrieve, retrieve_at_k_values
 
 __all__ = [
     "HRAssistPromptBuilder",
@@ -41,4 +42,6 @@ __all__ = [
     "check_dimension_consistency",
     "detect_near_duplicate_chunks",
     "DEFAULT_TEST_CASES",
+    "retrieve",
+    "retrieve_at_k_values",
 ]
