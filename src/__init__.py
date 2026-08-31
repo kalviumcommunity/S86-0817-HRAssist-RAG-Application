@@ -16,6 +16,12 @@ from src.embedding_quality import (
     DEFAULT_TEST_CASES,
 )
 from src.retriever import retrieve, retrieve_at_k_values
+from src.reranker import (
+    keyword_overlap_score,
+    rerank,
+    rerank_with_llm,
+    build_reranking_report,
+)
 
 __all__ = [
     "HRAssistPromptBuilder",
@@ -44,4 +50,8 @@ __all__ = [
     "DEFAULT_TEST_CASES",
     "retrieve",
     "retrieve_at_k_values",
+    "keyword_overlap_score",
+    "rerank",
+    "rerank_with_llm",
+    "build_reranking_report",
 ]
