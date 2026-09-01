@@ -22,6 +22,12 @@ from src.reranker import (
     rerank_with_llm,
     build_reranking_report,
 )
+from src.context_injector import (
+    format_chunk,
+    assemble_context,
+    assemble_context_with_truncation,
+    build_augmented_prompt,
+)
 
 __all__ = [
     "HRAssistPromptBuilder",
@@ -54,4 +60,8 @@ __all__ = [
     "rerank",
     "rerank_with_llm",
     "build_reranking_report",
+    "format_chunk",
+    "assemble_context",
+    "assemble_context_with_truncation",
+    "build_augmented_prompt",
 ]
