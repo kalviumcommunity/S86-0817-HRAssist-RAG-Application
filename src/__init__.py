@@ -28,6 +28,12 @@ from src.context_injector import (
     assemble_context_with_truncation,
     build_augmented_prompt,
 )
+from src.guardrails import (
+    RetrievalStrengthConfig,
+    retrieval_is_strong,
+    assess_retrieval,
+    guarded_answer,
+)
 
 __all__ = [
     "HRAssistPromptBuilder",
@@ -64,4 +70,8 @@ __all__ = [
     "assemble_context",
     "assemble_context_with_truncation",
     "build_augmented_prompt",
+    "RetrievalStrengthConfig",
+    "retrieval_is_strong",
+    "assess_retrieval",
+    "guarded_answer",
 ]
