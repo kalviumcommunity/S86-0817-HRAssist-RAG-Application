@@ -40,6 +40,13 @@ from src.conversational_rag import (
     rewrite_followup_simple,
     conversational_answer,
 )
+from src.document_processor import (
+    validate_upload,
+    store_upload,
+    process_uploaded_document,
+    UploadValidationError,
+    VECTOR_STORE,
+)
 
 __all__ = [
     "HRAssistPromptBuilder",
@@ -84,4 +91,9 @@ __all__ = [
     "rewrite_followup",
     "rewrite_followup_simple",
     "conversational_answer",
+    "validate_upload",
+    "store_upload",
+    "process_uploaded_document",
+    "UploadValidationError",
+    "VECTOR_STORE",
 ]
