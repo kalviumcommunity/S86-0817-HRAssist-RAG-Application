@@ -34,6 +34,12 @@ from src.guardrails import (
     assess_retrieval,
     guarded_answer,
 )
+from src.conversational_rag import (
+    ConversationHistory,
+    rewrite_followup,
+    rewrite_followup_simple,
+    conversational_answer,
+)
 
 __all__ = [
     "HRAssistPromptBuilder",
@@ -74,4 +80,8 @@ __all__ = [
     "retrieval_is_strong",
     "assess_retrieval",
     "guarded_answer",
+    "ConversationHistory",
+    "rewrite_followup",
+    "rewrite_followup_simple",
+    "conversational_answer",
 ]
