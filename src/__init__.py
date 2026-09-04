@@ -47,6 +47,20 @@ from src.document_processor import (
     UploadValidationError,
     VECTOR_STORE,
 )
+from src.observability import (
+    cache_key,
+    get_cached_answer,
+    save_cached_answer,
+    invalidate_cache,
+    cache_size,
+    estimate_cost,
+    build_usage_metadata,
+    log_rag_request,
+    get_usage_log,
+    clear_usage_log,
+    summarize_usage,
+    new_request_id,
+)
 
 __all__ = [
     "HRAssistPromptBuilder",
@@ -96,4 +110,16 @@ __all__ = [
     "process_uploaded_document",
     "UploadValidationError",
     "VECTOR_STORE",
+    "cache_key",
+    "get_cached_answer",
+    "save_cached_answer",
+    "invalidate_cache",
+    "cache_size",
+    "estimate_cost",
+    "build_usage_metadata",
+    "log_rag_request",
+    "get_usage_log",
+    "clear_usage_log",
+    "summarize_usage",
+    "new_request_id",
 ]
