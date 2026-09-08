@@ -142,6 +142,7 @@ def tag_chunks(
             meta.update(extra_metadata)
 
         tagged.append({
+            "id": f"{source}:{idx}",
             "text": text,
             "metadata": meta
         })
