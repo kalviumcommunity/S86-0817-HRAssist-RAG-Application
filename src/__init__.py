@@ -17,6 +17,7 @@ from src.embedding_quality import (
     DEFAULT_TEST_CASES,
 )
 from src.retriever import retrieve, retrieve_at_k_values
+from src.retrieval_tuning import evaluate_retrieval_settings, choose_best_setting
 from src.reranker import (
     keyword_overlap_score,
     rerank,
@@ -93,6 +94,8 @@ __all__ = [
     "DEFAULT_TEST_CASES",
     "retrieve",
     "retrieve_at_k_values",
+    "evaluate_retrieval_settings",
+    "choose_best_setting",
     "keyword_overlap_score",
     "rerank",
     "rerank_with_llm",
