@@ -1,0 +1,15 @@
+======================================================================
+RETRIEVAL EVALUATION & RECALL TESTING
+======================================================================
+
+Skipping query because its chunk ID has
+not been replaced yet:
+What are the password reset steps?
+
+Skipping query because its chunk ID has
+not been replaced yet:
+What are the employee attendance rules?
+
+Skipping query because its chunk ID has
+not been replaced yet:
+What evidence is required for project submission?
