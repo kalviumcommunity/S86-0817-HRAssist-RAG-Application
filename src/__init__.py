@@ -18,6 +18,12 @@ from src.embedding_quality import (
 )
 from src.retriever import retrieve, retrieve_at_k_values
 from src.retrieval_tuning import evaluate_retrieval_settings, choose_best_setting
+from src.rag_pipeline import (
+    embed_query,
+    retrieve_context,
+    assemble_retrieved_context,
+    answer_query,
+)
 from src.reranker import (
     keyword_overlap_score,
     rerank,
@@ -96,6 +102,10 @@ __all__ = [
     "retrieve_at_k_values",
     "evaluate_retrieval_settings",
     "choose_best_setting",
+    "embed_query",
+    "retrieve_context",
+    "assemble_retrieved_context",
+    "answer_query",
     "keyword_overlap_score",
     "rerank",
     "rerank_with_llm",
