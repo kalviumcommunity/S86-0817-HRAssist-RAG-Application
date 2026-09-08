@@ -98,7 +98,14 @@ def answer_query(
 
     assembled = assemble_retrieved_context(chunks, max_tokens=max_context_tokens)
     included_chunks = chunks[:assembled["chunks_included"]]
-    sources = [chunk["metadata"] for chunk in included_chunks]
+    sources = [
+        {
+            **chunk["metadata"],
+            "chunk_id": chunk.get("id", chunk["metadata"].get("chunk_id")),
+            "score": chunk.get("score"),
+        }
+        for chunk in included_chunks
+    ]
     citation_map = build_citation_map(included_chunks)
     answer = generate_fn(query, assembled["context"])
     citation_validation = validate_citations(answer, citation_map)
