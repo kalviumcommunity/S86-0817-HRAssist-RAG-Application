@@ -7,6 +7,7 @@ from src.model_config import ModelConfig, LLMController
 from src.document_loader import DocumentLoader, LoadedDocument
 from src.document_chunker import DocumentChunker, Chunk, ChunkMetadata, tag_chunks, estimate_tokens
 from src.similarity import cosine_similarity, rank_chunks, compare_embeddings
+from src.indexer import to_vector_record, index_embeddings, spot_check
 from src.batch_embedding import batches, embed_with_retry, run_batch_embedding
 from src.embedding_quality import (
     run_sanity_checks,
@@ -79,6 +80,9 @@ __all__ = [
     "cosine_similarity",
     "rank_chunks",
     "compare_embeddings",
+    "to_vector_record",
+    "index_embeddings",
+    "spot_check",
     "batches",
     "embed_with_retry",
     "run_batch_embedding",
