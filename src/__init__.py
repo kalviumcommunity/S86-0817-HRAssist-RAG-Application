@@ -24,6 +24,13 @@ from src.rag_pipeline import (
     assemble_retrieved_context,
     answer_query,
 )
+from src.citations import (
+    build_citation_map,
+    build_cited_prompt,
+    cited_markers,
+    validate_citations,
+    verify_citation,
+)
 from src.reranker import (
     keyword_overlap_score,
     rerank,
@@ -106,6 +113,11 @@ __all__ = [
     "retrieve_context",
     "assemble_retrieved_context",
     "answer_query",
+    "build_citation_map",
+    "build_cited_prompt",
+    "cited_markers",
+    "validate_citations",
+    "verify_citation",
     "keyword_overlap_score",
     "rerank",
     "rerank_with_llm",

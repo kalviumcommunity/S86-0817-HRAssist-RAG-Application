@@ -3,6 +3,7 @@
 from typing import Any, Callable, Dict, List, Sequence
 
 from src.context_injector import assemble_context
+from src.citations import build_citation_map, validate_citations
 from src.similarity import cosine_similarity
 
 
@@ -84,22 +85,28 @@ def answer_query(
         k=k,
         score_threshold=score_threshold,
     )
-    sources = [chunk["metadata"] for chunk in chunks]
 
     if not chunks:
         return {
             "answer": NO_CONTEXT_ANSWER,
             "sources": [],
+            "citations": {},
             "context": "",
             "chunks_retrieved": 0,
             "status": "no_context",
         }
 
     assembled = assemble_retrieved_context(chunks, max_tokens=max_context_tokens)
+    included_chunks = chunks[:assembled["chunks_included"]]
+    sources = [chunk["metadata"] for chunk in included_chunks]
+    citation_map = build_citation_map(included_chunks)
     answer = generate_fn(query, assembled["context"])
+    citation_validation = validate_citations(answer, citation_map)
     return {
         "answer": answer,
         "sources": sources[:assembled["chunks_included"]],
+        "citations": citation_map,
+        "citation_validation": citation_validation,
         "context": assembled["context"],
         "chunks_retrieved": len(chunks),
         "chunks_included": assembled["chunks_included"],
