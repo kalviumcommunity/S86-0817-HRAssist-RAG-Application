@@ -21,11 +21,12 @@ Sample upload
 
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, UploadFile, File, status
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
 from src.document_processor import (
     store_upload,
@@ -36,6 +37,7 @@ from src.document_processor import (
     SUPPORTED_EXTENSIONS,
     MAX_FILE_SIZE_BYTES,
 )
+from src.rag_pipeline import answer_query
 
 load_dotenv()
 
@@ -44,14 +46,20 @@ load_dotenv()
 # documents for real.  When they are absent the app indexes chunks without
 # vectors (safe for local dev without an API key).
 
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", os.getenv("EMBED_MODEL", ""))
+LLM_MODEL = os.getenv("LLM_MODEL", os.getenv("MODEL_NAME", ""))
+VECTOR_DB_URL = os.getenv("VECTOR_DB_URL", "")
+COLLECTION_NAME = os.getenv("COLLECTION_NAME", "rag_chunks")
+
 _embed_fn = None
+_generate_fn = None
 
 try:
     from openai import OpenAI
 
     _api_key  = os.getenv("OPENAI_API_KEY")
     _base_url = os.getenv("OPENAI_BASE_URL")
-    _model    = os.getenv("EMBED_MODEL")
+    _model    = EMBEDDING_MODEL
 
     if _api_key and _model:
         _client = OpenAI(api_key=_api_key, base_url=_base_url)
@@ -59,6 +67,26 @@ try:
         def _embed_fn(texts):
             response = _client.embeddings.create(model=_model, input=texts)
             return [item.embedding for item in response.data]
+
+        if LLM_MODEL:
+            def _generate_fn(question, context):
+                response = _client.chat.completions.create(
+                    model=LLM_MODEL,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": (
+                                "Answer only from the provided context. "
+                                "If it is insufficient, say so."
+                            ),
+                        },
+                        {
+                            "role": "user",
+                            "content": f"Context:\n{context}\n\nQuestion: {question}",
+                        },
+                    ],
+                )
+                return response.choices[0].message.content
 
 except Exception:
     _embed_fn = None
@@ -77,6 +105,28 @@ app = FastAPI(
 )
 
 
+class QueryRequest(BaseModel):
+    """Validated user question accepted by the RAG endpoint."""
+
+    question: str = Field(min_length=3, max_length=1000)
+
+
+class Source(BaseModel):
+    """A source reference returned with a grounded answer."""
+
+    source: str
+    chunk_id: Optional[str] = None
+    score: Optional[float] = None
+
+
+class QueryResponse(BaseModel):
+    """Stable JSON response contract for RAG clients."""
+
+    answer: str
+    sources: List[Source]
+    status: str
+
+
 # ── Health check ──────────────────────────────────────────────────────────
 
 @app.get("/health", summary="Service health check")
@@ -89,6 +139,9 @@ def health() -> Dict[str, Any]:
         "supported_extensions": sorted(SUPPORTED_EXTENSIONS),
         "max_file_size_mb": MAX_FILE_SIZE_BYTES / (1024 * 1024),
         "embed_enabled": _embed_fn is not None,
+        "query_enabled": _embed_fn is not None and _generate_fn is not None,
+        "collection_name": COLLECTION_NAME,
+        "vector_db_configured": bool(VECTOR_DB_URL),
     }
 
 
@@ -166,3 +219,45 @@ async def upload_document(
         "filename": file.filename,
         "summary": summary,
     }
+
+
+@app.post(
+    "/query",
+    response_model=QueryResponse,
+    summary="Answer a question using retrieved policy context",
+)
+def query_rag(request: QueryRequest) -> QueryResponse:
+    """Run the RAG pipeline and return an answer with source metadata."""
+
+    if _embed_fn is None or _generate_fn is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="RAG query service is not configured",
+        )
+
+    try:
+        result = answer_query(
+            query=request.question,
+            chunk_records=VECTOR_STORE,
+            embed_fn=_embed_fn,
+            generate_fn=_generate_fn,
+        )
+        return QueryResponse(
+            answer=result["answer"],
+            sources=[
+                Source(
+                    source=source.get("source", "unknown"),
+                    chunk_id=source.get("chunk_id"),
+                    score=source.get("score"),
+                )
+                for source in result.get("sources", [])
+            ],
+            status=result.get("status", "answered"),
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="RAG service failed",
+        )
