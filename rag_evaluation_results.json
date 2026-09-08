@@ -1,0 +1,87 @@
+{
+  "questions": 3,
+  "average_correctness": 0.5,
+  "average_grounding": 0.0,
+  "average_citation_accuracy": 0.0,
+  "overall_quality": 0.17,
+  "results": [
+    {
+      "question": "What are the password reset steps?",
+      "answer": "There is not enough information in the provided context to answer your question regarding password reset steps.",
+      "expected_points": [
+        "password reset",
+        "registered email"
+      ],
+      "expected_sources": [
+        "account-guide.md"
+      ],
+      "citations": [
+        {
+          "id": "employee_leave_policy.txt:0",
+          "source": "employee_leave_policy.txt",
+          "section": "Leave Request Process"
+        }
+      ],
+      "correctness": 0.5,
+      "grounding": 0.0,
+      "citation_accuracy": 0.0,
+      "failure_analysis": [
+        "Expected answer points were missing.",
+        "Some answer claims may not be fully supported by retrieved context.",
+        "Citations did not fully match the expected sources."
+      ]
+    },
+    {
+      "question": "What evidence is required for project submission?",
+      "answer": "There is not enough information in the provided context to answer your question regarding evidence required for project submission. The provided text only covers the leave request process.",
+      "expected_points": [
+        "PR link",
+        "sample output",
+        "video explanation"
+      ],
+      "expected_sources": [
+        "submission-rubric.md"
+      ],
+      "citations": [
+        {
+          "id": "employee_leave_policy.txt:0",
+          "source": "employee_leave_policy.txt",
+          "section": "Leave Request Process"
+        }
+      ],
+      "correctness": 0.0,
+      "grounding": 0.0,
+      "citation_accuracy": 0.0,
+      "failure_analysis": [
+        "Expected answer points were missing.",
+        "Some answer claims may not be fully supported by retrieved context.",
+        "Citations did not fully match the expected sources."
+      ]
+    },
+    {
+      "question": "What should the system do when information is missing?",
+      "answer": "There is not enough information in the provided context to answer this question.",
+      "expected_points": [
+        "not enough information",
+        "provided context"
+      ],
+      "expected_sources": [
+        "guardrails.md"
+      ],
+      "citations": [
+        {
+          "id": "employee_leave_policy.txt:0",
+          "source": "employee_leave_policy.txt",
+          "section": "Leave Request Process"
+        }
+      ],
+      "correctness": 1.0,
+      "grounding": 0.0,
+      "citation_accuracy": 0.0,
+      "failure_analysis": [
+        "Some answer claims may not be fully supported by retrieved context.",
+        "Citations did not fully match the expected sources."
+      ]
+    }
+  ]
+}
