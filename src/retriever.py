@@ -29,6 +29,7 @@ def retrieve(
     embed_fn: Callable[[List[str]], List[List[float]]],
     k: int = 3,
     score_threshold: Optional[float] = None,
+    metadata_filter: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     """Embed a query and return the top-k most similar chunks.
 
@@ -49,6 +50,8 @@ def retrieve(
         score_threshold: When provided, only chunks whose cosine similarity
             score is >= this value are returned (applied after top-k slicing).
             Useful for dropping low-confidence matches from small corpora.
+        metadata_filter: When provided, only chunks whose metadata contains
+            every requested key/value pair are scored and returned.
 
     Returns:
         List of result dicts sorted by descending score, length <= k. Each
@@ -77,6 +80,16 @@ def retrieve(
         raise ValueError(f"k must be >= 1, got {k}")
     if not chunk_records:
         raise ValueError("chunk_records must not be empty")
+
+    if metadata_filter:
+        chunk_records = [
+            record for record in chunk_records
+            if all(record.get("metadata", {}).get(key) == value
+                   for key, value in metadata_filter.items())
+        ]
+
+    if not chunk_records:
+        return []
 
     # ── Step 1: embed the query ───────────────────────────────────────────
     # The embed function must use the same model as the corpus. If models
