@@ -20,12 +20,14 @@ Sample upload
 """
 
 import os
+import json
+from typing import AsyncIterator
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, UploadFile, File, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from src.document_processor import (
@@ -38,6 +40,8 @@ from src.document_processor import (
     MAX_FILE_SIZE_BYTES,
 )
 from src.rag_pipeline import answer_query
+from src.rag_pipeline import embed_query, retrieve_context, assemble_retrieved_context
+from src.citations import build_citation_map
 
 load_dotenv()
 
@@ -53,6 +57,7 @@ COLLECTION_NAME = os.getenv("COLLECTION_NAME", "rag_chunks")
 
 _embed_fn = None
 _generate_fn = None
+_generate_stream_fn = None
 
 try:
     from openai import OpenAI
@@ -87,6 +92,26 @@ try:
                     ],
                 )
                 return response.choices[0].message.content
+
+            def _generate_stream_fn(question, context):
+                response = _client.chat.completions.create(
+                    model=LLM_MODEL,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "Answer only from the provided context. If it is insufficient, say so.",
+                        },
+                        {
+                            "role": "user",
+                            "content": f"Context:\n{context}\n\nQuestion: {question}",
+                        },
+                    ],
+                    stream=True,
+                )
+                for event in response:
+                    text = event.choices[0].delta.content
+                    if text:
+                        yield text
 
 except Exception:
     _embed_fn = None
@@ -127,6 +152,64 @@ class QueryResponse(BaseModel):
     status: str
 
 
+def _sse_event(event: Dict[str, Any]) -> str:
+    """Serialize one server-sent event with JSON payload."""
+
+    return f"data: {json.dumps(event)}\n\n"
+
+
+def _answer_chunks(answer: str, chunk_size: int = 24) -> List[str]:
+    """Split a completed answer into small UI-friendly stream chunks."""
+
+    return [answer[start : start + chunk_size] for start in range(0, len(answer), chunk_size)]
+
+
+async def _stream_query_events(question: str) -> AsyncIterator[str]:
+    """Yield citation, answer, completion, or error SSE events."""
+
+    try:
+        if _embed_fn is None or (_generate_fn is None and _generate_stream_fn is None):
+            raise RuntimeError("RAG query service is not configured")
+
+        query_vector = embed_query(question, _embed_fn)
+        chunks = retrieve_context(query_vector, VECTOR_STORE)
+        assembled = assemble_retrieved_context(chunks)
+        citation_map = build_citation_map(chunks[:assembled["chunks_included"]])
+        sources = []
+        for label, citation in citation_map.items():
+            sources.append({
+                "id": citation.get("chunk_id") or label,
+                "label": label,
+                "document": citation.get("source"),
+                "chunk_id": citation.get("chunk_id"),
+                "section": citation.get("section"),
+                "text": citation.get("text", ""),
+            })
+        yield _sse_event({"type": "citations", "sources": sources})
+
+        if not chunks:
+            yield _sse_event({"type": "token", "text": "I could not find relevant context for that question."})
+        elif _generate_stream_fn is not None:
+            for text in _generate_stream_fn(question, assembled["context"]):
+                yield _sse_event({"type": "token", "text": text})
+        else:
+            result = answer_query(
+                query=question,
+                chunk_records=VECTOR_STORE,
+                embed_fn=_embed_fn,
+                generate_fn=_generate_fn,
+            )
+            for text in _answer_chunks(result["answer"]):
+                yield _sse_event({"type": "token", "text": text})
+
+        yield _sse_event({"type": "done"})
+    except Exception:
+        yield _sse_event({
+            "type": "error",
+            "message": "The answer stopped streaming. Please retry.",
+        })
+
+
 # ── Health check ──────────────────────────────────────────────────────────
 
 @app.get("/health", summary="Service health check")
@@ -139,7 +222,9 @@ def health() -> Dict[str, Any]:
         "supported_extensions": sorted(SUPPORTED_EXTENSIONS),
         "max_file_size_mb": MAX_FILE_SIZE_BYTES / (1024 * 1024),
         "embed_enabled": _embed_fn is not None,
-        "query_enabled": _embed_fn is not None and _generate_fn is not None,
+        "query_enabled": _embed_fn is not None and (
+            _generate_fn is not None or _generate_stream_fn is not None
+        ),
         "collection_name": COLLECTION_NAME,
         "vector_db_configured": bool(VECTOR_DB_URL),
     }
@@ -261,3 +346,18 @@ def query_rag(request: QueryRequest) -> QueryResponse:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="RAG service failed",
         )
+
+
+@app.post(
+    "/query/stream",
+    summary="Stream a grounded answer with citations",
+    response_class=StreamingResponse,
+)
+async def stream_query(request: QueryRequest) -> StreamingResponse:
+    """Stream citations and answer chunks as server-sent events."""
+
+    return StreamingResponse(
+        _stream_query_events(request.question),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
