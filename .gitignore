@@ -1,10 +1,53 @@
 # Environment variables
 .env
+.env.local
 
 # Virtual environment
 venv/
 .venv/
+env/
+ENV/
 
 # Python cache
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build and distribution
+build/
+dist/
+*.egg-info/
+
+# Logs
+*.log
+
+# Uploads directory (user-uploaded documents)
+uploads/*
+!uploads/.gitkeep
+
+# Temporary files
+*.tmp
+*.bak
+
+# Evaluation results (intermediate files)
+*_results.json
+*_results.txt
+sample_output.txt

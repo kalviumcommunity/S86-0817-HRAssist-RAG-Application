@@ -14,64 +14,61 @@ from openai import (
 # Load environment configuration
 # -----------------------------------------
 
-load_dotenv()
-
-API_KEY = os.getenv("OPENAI_API_KEY")
-BASE_URL = os.getenv("OPENAI_BASE_URL")
-EMBED_MODEL = os.getenv("EMBED_MODEL")
-
-
 # -----------------------------------------
 # Vector dimension
 # -----------------------------------------
-# IMPORTANT:
-# Replace this with the actual vector
-# length returned by your embedding API.
-
 VECTOR_DIMENSION = 3072
-
 
 # -----------------------------------------
 # Collection configuration
 # -----------------------------------------
-
 COLLECTION_NAME = "rag_chunks"
 
 
 # -----------------------------------------
-# Create Gemini OpenAI-compatible client
+# Load environment configuration
 # -----------------------------------------
 
-client = OpenAI(
-    api_key=API_KEY,
-    base_url=BASE_URL
-)
+load_dotenv()
+
+_API_KEY = os.getenv("OPENAI_API_KEY")
+_BASE_URL = os.getenv("OPENAI_BASE_URL")
+_EMBED_MODEL = os.getenv("EMBED_MODEL")
+
+# Lazy-initialized module-level singletons
+_client = None
+_chroma_client = None
+_collection = None
 
 
-# -----------------------------------------
-# Create persistent ChromaDB client
-# -----------------------------------------
+def _get_openai_client():
+    """Lazily create and return the OpenAI client."""
+    global _client
+    if _client is not None:
+        return _client
 
-chroma_client = chromadb.PersistentClient(
-    path="./chroma_db"
-)
+    if not _API_KEY:
+        raise ValueError("OPENAI_API_KEY is missing from .env")
+    if not _EMBED_MODEL:
+        raise ValueError("EMBED_MODEL is missing from .env")
+
+    _client = OpenAI(api_key=_API_KEY, base_url=_BASE_URL)
+    return _client
 
 
-# -----------------------------------------
-# Create / retrieve collection
-# -----------------------------------------
+def _get_collection():
+    """Lazily create and return the ChromaDB collection."""
+    global _chroma_client, _collection
+    if _collection is not None:
+        return _collection
 
-collection = chroma_client.get_or_create_collection(
-    name=COLLECTION_NAME,
-    metadata={
-        "description": "HR Assist RAG document chunks"
-    },
-    configuration={
-        "hnsw": {
-            "space": "cosine"
-        }
-    }
-)
+    _chroma_client = chromadb.PersistentClient(path="./chroma_db")
+    _collection = _chroma_client.get_or_create_collection(
+        name=COLLECTION_NAME,
+        metadata={"description": "HR Assist RAG document chunks"},
+        configuration={"hnsw": {"space": "cosine"}},
+    )
+    return _collection
 
 
 def main():
@@ -80,7 +77,10 @@ def main():
     print("VECTOR DATABASE SETUP & COLLECTION TEST")
     print("=" * 70)
 
-    print("\nEmbedding model:", EMBED_MODEL)
+    client = _get_openai_client()
+    collection = _get_collection()
+
+    print("\nEmbedding model:", _EMBED_MODEL)
     print("Collection:", COLLECTION_NAME)
     print("Expected vector dimension:", VECTOR_DIMENSION)
 
@@ -108,7 +108,7 @@ def main():
         # -----------------------------------------
 
         response = client.embeddings.create(
-            model=EMBED_MODEL,
+            model=_EMBED_MODEL,
             input=[test_text]
         )
 
