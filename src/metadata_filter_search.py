@@ -11,43 +11,42 @@ import chromadb
 
 load_dotenv()
 
-API_KEY = os.getenv("OPENAI_API_KEY")
-BASE_URL = os.getenv("OPENAI_BASE_URL")
-EMBED_MODEL = os.getenv("EMBED_MODEL")
+_API_KEY = os.getenv("OPENAI_API_KEY")
+_BASE_URL = os.getenv("OPENAI_BASE_URL")
+_EMBED_MODEL = os.getenv("EMBED_MODEL")
 
-if not API_KEY:
-    raise ValueError("OPENAI_API_KEY is missing from .env")
-
-if not BASE_URL:
-    raise ValueError("OPENAI_BASE_URL is missing from .env")
-
-if not EMBED_MODEL:
-    raise ValueError("EMBED_MODEL is missing from .env")
+# Lazy-initialized module-level singletons
+_openai_client = None
+_chroma_client = None
+_collection = None
 
 
-# --------------------------------------------------
-# 2. Create Gemini OpenAI-compatible client
-# --------------------------------------------------
+def _get_openai_client():
+    """Lazily create and return the OpenAI client."""
+    global _openai_client
+    if _openai_client is not None:
+        return _openai_client
 
-openai_client = OpenAI(
-    api_key=API_KEY,
-    base_url=BASE_URL
-)
+    if not _API_KEY:
+        raise ValueError("OPENAI_API_KEY is missing from .env")
+    if not _BASE_URL:
+        raise ValueError("OPENAI_BASE_URL is missing from .env")
+    if not _EMBED_MODEL:
+        raise ValueError("EMBED_MODEL is missing from .env")
+
+    _openai_client = OpenAI(api_key=_API_KEY, base_url=_BASE_URL)
+    return _openai_client
 
 
-# --------------------------------------------------
-# 3. Connect to existing ChromaDB
-# --------------------------------------------------
+def _get_collection():
+    """Lazily create and return the ChromaDB collection."""
+    global _chroma_client, _collection
+    if _collection is not None:
+        return _collection
 
-chroma_client = chromadb.PersistentClient(
-    path="./chroma_db"
-)
-
-COLLECTION_NAME = "rag_chunks"
-
-collection = chroma_client.get_collection(
-    name=COLLECTION_NAME
-)
+    _chroma_client = chromadb.PersistentClient(path="./chroma_db")
+    _collection = _chroma_client.get_collection(name="rag_chunks")
+    return _collection
 
 
 # --------------------------------------------------
@@ -55,11 +54,9 @@ collection = chroma_client.get_collection(
 # --------------------------------------------------
 
 def embed_query(query):
-    response = openai_client.embeddings.create(
-        model=EMBED_MODEL,
-        input=query
-    )
-
+    """Create query embedding."""
+    client = _get_openai_client()
+    response = client.embeddings.create(model=_EMBED_MODEL, input=query)
     return response.data[0].embedding
 
 
@@ -68,8 +65,9 @@ def embed_query(query):
 # --------------------------------------------------
 
 def retrieve(query, k=3, metadata_filter=None):
-
+    """Vector retrieval with optional metadata filter."""
     query_vector = embed_query(query)
+    collection = _get_collection()
 
     results = collection.query(
         query_embeddings=[query_vector],

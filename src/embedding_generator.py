@@ -1,12 +1,12 @@
 import os
-from typing import List
+from typing import List, Optional
 
 from dotenv import load_dotenv
 from openai import (
     OpenAI,
     AuthenticationError,
     RateLimitError,
-    APIError
+    APIError,
 )
 
 from src.similarity import cosine_similarity
@@ -15,33 +15,41 @@ from src.similarity import cosine_similarity
 # Load environment variables from .env
 load_dotenv()
 
+# Read configuration from .env — kept as module-level vars but validation
+# is deferred to _get_client() so this module can be safely imported without
+# a configured .env (e.g. in tests or when used as a library).
+_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
+_BASE_URL: Optional[str] = os.getenv("OPENAI_BASE_URL")
+_EMBED_MODEL: Optional[str] = os.getenv("EMBED_MODEL")
 
-# Read configuration from .env
-API_KEY = os.getenv("OPENAI_API_KEY")
-BASE_URL = os.getenv("OPENAI_BASE_URL")
-EMBED_MODEL = os.getenv("EMBED_MODEL")
+# Public alias used by callers that just need the model name string
+EMBED_MODEL: str = _EMBED_MODEL or ""
 
-
-# Check required configuration
-if not API_KEY:
-    raise ValueError(
-        "OPENAI_API_KEY is missing from the .env file"
-    )
-
-if not EMBED_MODEL:
-    raise ValueError(
-        "EMBED_MODEL is missing from the .env file"
-    )
+# Module-level client — created lazily on first use
+_client: Optional[OpenAI] = None
 
 
-# Create OpenAI-compatible client for Gemini API
-client = OpenAI(
-    api_key=API_KEY,
-    base_url=BASE_URL
-)
+def _get_client() -> OpenAI:
+    """Return (and lazily create) the OpenAI-compatible client.
+
+    Raises ``ValueError`` with a clear message if required env vars are
+    absent.  Deferring this check to call-time means the module can always
+    be imported safely.
+    """
+    global _client
+    if _client is not None:
+        return _client
+
+    if not _API_KEY:
+        raise ValueError("OPENAI_API_KEY is missing from the .env file")
+    if not _EMBED_MODEL:
+        raise ValueError("EMBED_MODEL is missing from the .env file")
+
+    _client = OpenAI(api_key=_API_KEY, base_url=_BASE_URL)
+    return _client
 
 
-# Small HR-related corpus used for chunk-level embedding
+# Small HR-related corpus used for chunk-level embedding demos
 chunks = [
     {
         "text": (
@@ -51,8 +59,8 @@ chunks = [
         "metadata": {
             "source": "employee_leave_policy.txt",
             "chunk_index": 0,
-            "section": "Annual Leave"
-        }
+            "section": "Annual Leave",
+        },
     },
     {
         "text": (
@@ -62,8 +70,8 @@ chunks = [
         "metadata": {
             "source": "employee_leave_policy.txt",
             "chunk_index": 1,
-            "section": "Leave Request Process"
-        }
+            "section": "Leave Request Process",
+        },
     },
     {
         "text": (
@@ -73,19 +81,18 @@ chunks = [
         "metadata": {
             "source": "employee_leave_policy.txt",
             "chunk_index": 2,
-            "section": "Sick Leave"
-        }
-    }
+            "section": "Sick Leave",
+        },
+    },
 ]
 
 
 def embed(texts: List[str]) -> List[List[float]]:
-    """
-    Generate embedding vectors for a list of raw text strings.
+    """Generate embedding vectors for a list of raw text strings.
 
-    Sends all texts in a single API request and returns a list of
-    float vectors in the same order as the input. Each vector's
-    length (dimension) is determined by the embedding model.
+    Sends all texts in a single API request and returns a list of float
+    vectors in the same order as the input. Each vector's length (dimension)
+    is determined by the embedding model.
 
     Args:
         texts: Plain text strings to embed.
@@ -93,39 +100,39 @@ def embed(texts: List[str]) -> List[List[float]]:
     Returns:
         A list of float vectors, one per input text.
     """
+    client = _get_client()
     response = client.embeddings.create(
-        model=EMBED_MODEL,
-        input=texts
+        model=_EMBED_MODEL,  # type: ignore[arg-type]  — validated in _get_client
+        input=texts,
     )
     # response.data is ordered to match the input list
     return [item.embedding for item in response.data]
 
 
-def generate_embeddings(chunks):
-    """
-    Generate embeddings for prepared text chunks.
+def generate_embeddings(chunk_list: List[dict]) -> List[dict]:
+    """Generate embeddings for prepared text chunks.
+
     Each embedding is stored with its original text and metadata.
 
     Args:
-        chunks: List of dicts with 'text' and 'metadata' keys.
+        chunk_list: List of dicts with 'text' and 'metadata' keys.
 
     Returns:
         List of records combining text, metadata, and embedding vector.
     """
+    texts = [chunk["text"] for chunk in chunk_list]
 
-    texts = [chunk["text"] for chunk in chunks]
-
-    print(f"\nGenerating embeddings using: {EMBED_MODEL}")
+    print(f"\nGenerating embeddings using: {_EMBED_MODEL}")
     print(f"Number of chunks: {len(texts)}")
 
     embeddings = embed(texts)
 
     records = []
-    for chunk, embedding in zip(chunks, embeddings):
+    for chunk, embedding in zip(chunk_list, embeddings):
         record = {
             "text": chunk["text"],
             "metadata": chunk["metadata"],
-            "embedding": embedding
+            "embedding": embedding,
         }
         records.append(record)
 
@@ -133,12 +140,7 @@ def generate_embeddings(chunks):
 
 
 def demonstrate_vector_dimension(embeddings: List[List[float]]) -> None:
-    """
-    Report the vector dimension and a sample of the first embedding.
-
-    The dimension is the number of numeric coordinates in each vector.
-    For example, gemini-embedding-001 produces 3072-dimensional vectors.
-    Every text, regardless of length, maps to the same fixed-size vector.
+    """Report the vector dimension and a sample of the first embedding.
 
     Args:
         embeddings: List of embedding vectors returned by embed().
@@ -154,14 +156,10 @@ def demonstrate_vector_dimension(embeddings: List[List[float]]) -> None:
     )
 
 
-def demonstrate_semantic_similarity(embeddings: List[List[float]], texts: List[str]) -> None:
-    """
-    Compare a semantically similar pair against a dissimilar pair using
-    cosine similarity to validate that the embedding model captures meaning.
-
-    Cosine similarity measures the angle between two vectors in high-dimensional
-    space. A score near 1.0 means the vectors point in the same direction
-    (similar meaning); a score near 0.0 or below means unrelated or opposite.
+def demonstrate_semantic_similarity(
+    embeddings: List[List[float]], texts: List[str]
+) -> None:
+    """Compare a semantically similar pair against a dissimilar pair.
 
     Args:
         embeddings: Embedding vectors aligned with ``texts``.
@@ -192,21 +190,15 @@ def demonstrate_semantic_similarity(embeddings: List[List[float]], texts: List[s
             "Check that the embedding model is loaded correctly."
         )
 
-    print(
-        "\nWhy cosine similarity works here: it compares the direction of "
-        "two vectors, not their magnitude. Texts about the same topic point "
-        "in a similar direction in vector space even when the exact words differ."
-    )
 
-
-def print_results(records):
+def print_results(records: List[dict]) -> None:
     """Print a formatted summary of all embedding records."""
 
     print("\n" + "=" * 70)
     print("EMBEDDING GENERATION RESULTS")
     print("=" * 70)
 
-    print(f"\nEmbedding model: {EMBED_MODEL}")
+    print(f"\nEmbedding model: {_EMBED_MODEL}")
     print(f"Number of chunks embedded: {len(records)}")
 
     if records:
@@ -233,16 +225,14 @@ def print_results(records):
         print("Vector sample:", record["embedding"][:5])
 
 
-def main():
+def main() -> None:
+    """Run the embedding generation demo."""
 
     print("=" * 70)
     print("GENERATING EMBEDDINGS VIA GEMINI API")
     print("=" * 70)
 
     # ── Part 1: sample texts demonstrating semantic meaning ──────────────
-    # These three sentences are chosen deliberately:
-    #   [0] and [1] share meaning (password reset ≈ account recovery)
-    #   [0] and [2] are unrelated (password reset vs cafeteria menu)
     sample_texts = [
         "How do I reset my account password?",
         "Steps to recover access to my login",
@@ -255,13 +245,10 @@ def main():
         print("PART 1 — VECTOR DIMENSION & SEMANTIC SIMILARITY DEMO")
         print("=" * 70)
 
-        print(f"\nEmbedding {len(sample_texts)} sample texts with {EMBED_MODEL} ...")
+        print(f"\nEmbedding {len(sample_texts)} sample texts with {_EMBED_MODEL} ...")
         sample_embeddings = embed(sample_texts)
 
-        # Report dimension and first 8 values
         demonstrate_vector_dimension(sample_embeddings)
-
-        # Compare similar vs dissimilar pairs
         demonstrate_semantic_similarity(sample_embeddings, sample_texts)
 
         # ── Part 2: chunk-level embedding for the HR corpus ──────────────

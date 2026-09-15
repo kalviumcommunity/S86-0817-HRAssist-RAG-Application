@@ -51,7 +51,8 @@ load_dotenv()
 # vectors (safe for local dev without an API key).
 
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", os.getenv("EMBED_MODEL", ""))
-LLM_MODEL = os.getenv("LLM_MODEL", os.getenv("MODEL_NAME", ""))
+# Honour CHAT_MODEL (the name used in .env.example) as well as LLM_MODEL / MODEL_NAME
+LLM_MODEL = os.getenv("LLM_MODEL", os.getenv("MODEL_NAME", os.getenv("CHAT_MODEL", "")))
 VECTOR_DB_URL = os.getenv("VECTOR_DB_URL", "")
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "rag_chunks")
 
@@ -115,6 +116,58 @@ try:
 
 except Exception:
     _embed_fn = None
+
+
+# ── Load pre-indexed ChromaDB chunks into VECTOR_STORE at startup ─────────
+# The persisted ChromaDB directory (./chroma_db) contains chunks that were
+# indexed during corpus ingestion.  We load them into the in-memory
+# VECTOR_STORE so that /query works immediately without re-uploading docs.
+
+def _load_chroma_into_vector_store() -> int:
+    """Load all records from ChromaDB into the module-level VECTOR_STORE.
+
+    Returns the number of records loaded, or 0 on any error.
+    """
+    try:
+        import chromadb
+
+        _chroma = chromadb.PersistentClient(path="./chroma_db")
+        _col = _chroma.get_collection(name=COLLECTION_NAME)
+        total = _col.count()
+        if total == 0:
+            return 0
+
+        # Fetch in batches of 500 to stay within memory limits
+        batch_size = 500
+        loaded = 0
+        for offset in range(0, total, batch_size):
+            result = _col.get(
+                limit=batch_size,
+                offset=offset,
+                include=["embeddings", "documents", "metadatas"],
+            )
+            ids = result.get("ids", [])
+            embeddings = result.get("embeddings") or []
+            documents = result.get("documents") or []
+            metadatas = result.get("metadatas") or []
+
+            for rec_id, emb, doc, meta in zip(ids, embeddings, documents, metadatas):
+                VECTOR_STORE.append({
+                    "id": rec_id,
+                    "text": doc,
+                    "metadata": meta or {},
+                    "embedding": emb if emb is not None else [],
+                })
+                loaded += 1
+        return loaded
+    except Exception as _exc:
+        print(f"[startup] Could not load ChromaDB into VECTOR_STORE: {_exc}")
+        return 0
+
+
+_chroma_loaded = _load_chroma_into_vector_store()
+if _chroma_loaded:
+    print(f"[startup] Loaded {_chroma_loaded} chunks from ChromaDB into VECTOR_STORE.")
 
 
 # ── FastAPI app ───────────────────────────────────────────────────────────
